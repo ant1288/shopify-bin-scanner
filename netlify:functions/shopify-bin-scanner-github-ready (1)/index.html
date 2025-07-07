@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shopify Bin Location Scanner</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    #reader { width: 100%; max-width: 400px; margin-top: 20px; }
+    #binForm { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Scan Product Barcode</h1>
+
+  <div id="reader"></div>
+
+  <form id="binForm">
+    <label for="barcode">Scanned Barcode:</label><br>
+    <input type="text" id="barcode" required autofocus><br><br>
+
+    <label for="bin">Enter Bin Location:</label><br>
+    <input type="text" id="bin" required><br><br>
+
+    <button type="submit">Save Bin Location</button>
+  </form>
+
+  <p id="result"></p>
+
+  <script>
+    const html5QrCode = new Html5Qrcode("reader");
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length) {
+        html5QrCode.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: 250
+          },
+          qrCodeMessage => {
+            document.getElementById('barcode').value = qrCodeMessage;
+            html5QrCode.stop();
+          },
+          errorMessage => {
+            // ignore errors
+          }
+        );
+      }
+    }).catch(err => {
+      console.error(err);
+    });
+
+    document.getElementById('binForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const barcode = document.getElementById('barcode').value.trim();
+      const bin = document.getElementById('bin').value.trim();
+      const result = document.getElementById('result');
+
+      result.innerText = 'Sending to serverless function...';
+
+      try {
+        const res = await fetch('/.netlify/functions/update-bin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ barcode, bin })
+        });
+
+        const json = await res.json();
+        if (json.success) {
+          result.innerText = 'Bin location saved successfully!';
+          document.getElementById('binForm').reset();
+        } else {
+          result.innerText = 'Error: ' + json.message;
+        }
+      } catch (err) {
+        result.innerText = 'Unexpected error: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
